@@ -36,7 +36,7 @@ namespace ParEx
 {
 
 PXChannel::PXChannel (std::shared_ptr<PXIO> io)
-  : io_ (io), exps_ ()
+  : io_ (io), exps_ (), buffer_ ()
 {
   // Empty
 }
@@ -45,7 +45,7 @@ PXChannel::PXChannel (std::shared_ptr<PXIO> io)
 void
 PXChannel::add_expect(const std::string &expr, timeval_t timeout, exp_type_t et)
 {
-  expectation_t exp = { expr, timeout, timeout, NULL };
+  expectation_t exp (expr, timeout);
   if (et == PXPARALLEL || exps_.empty ())
   {
     expect_list_t el = { exp };
@@ -59,8 +59,8 @@ PXChannel::add_expect(const std::string &expr, timeval_t timeout, exp_type_t et)
 void
 PXChannel::clear_expects ()
 {
-  expect_set_t tmp;
-  exps_.swap (tmp.expect_groups);
+  expect_groups_t tmp;
+  exps_.swap (tmp);
 }
 
 } // namespace

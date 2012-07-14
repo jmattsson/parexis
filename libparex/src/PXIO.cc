@@ -32,6 +32,7 @@
 
 #include "PXIO.h"
 #include <unistd.h>
+#include <errno.h>
 
 namespace ParEx
 {
@@ -40,9 +41,9 @@ static void throw_errno ()
 {
   switch (errno)
   {
-    case EINTR: throw PXIO::INTR ();
-    case EAGAIN: throw PXIO::AGAIN ();
-    default: throw PXIO::ERR ();
+    case EINTR: throw PXIO::E_INTR ();
+    case EAGAIN: throw PXIO::E_AGAIN ();
+    default: throw PXIO::E_ERR ();
   }
 }
 
@@ -52,7 +53,7 @@ PXIO::getc ()
   char c;
   ssize_t ret = read (fd_, &c, 1);
   if (ret == 0)
-    throw PXIO::EOF ();
+    throw PXIO::E_EOF ();
   else if (ret < 0)
     throw_errno ();
   return c;
@@ -64,7 +65,7 @@ PXIO::putc (char c)
 {
   ssize_t ret = write (fd_, &c, 1);
   if (ret == 0)
-    throw PXIO::AGAIN ();
+    throw PXIO::E_AGAIN ();
   else if (ret < 0)
     throw_errno ();
 }

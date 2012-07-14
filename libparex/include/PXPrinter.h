@@ -41,6 +41,8 @@ namespace ParEx
 class PXPrinter
 {
   public:
+    virtual ~PXPrinter () {};
+
     virtual void addChannel (channel_id_t chan_id) = 0;
     virtual void removeChannel (channel_id_t chan_id) = 0;
 

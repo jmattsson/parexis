@@ -64,13 +64,30 @@ static inline timeval_t &operator -= (timeval_t &a, const timeval_t &b)
 }
 
 
-typedef struct
+class expectation_t
 {
-  std::string expr;
-  timeval_t timeout;
-  timeval_t time_left;
-  void *compiled_regex;
-} expectation_t;
+  public:
+    std::string expr;
+    timeval_t timeout;
+    timeval_t time_left;
+    void *compiled_regex;
+
+    expectation_t ()
+      : expr (), timeout (), time_left (), compiled_regex (NULL) {}
+    expectation_t (const std::string &e, timeval_t t)
+      : expr (e), timeout (t), time_left (t), compiled_regex (NULL) {}
+    expectation_t (const std::string &e, timeval_t t, timeval_t l, void *p)
+      : expr (e), timeout (t), time_left (l), compiled_regex (p) {}
+    expectation_t (const expectation_t &b)
+      : expr (b.expr), timeout (b.timeout), time_left (b.time_left),
+        compiled_regex (b.compiled_regex) {}
+    expectation_t &operator = (const expectation_t &b)
+    {
+      expectation_t tmp (b);
+      std::swap (*this, tmp);
+      return *this;
+    }
+};
 
 
 typedef std::list<expectation_t> expect_list_t;

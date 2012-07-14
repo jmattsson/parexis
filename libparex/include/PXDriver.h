@@ -34,17 +34,19 @@
 #define _PXDRIVER_H_
 
 #include "PXChannel.h"
-#include "PXPrinter.h"
 #include <memory>
 #include <utility>
 #include <vector>
 #include <cstdint>
+#include <sys/select.h>
 
 namespace ParEx
 {
 
 // opaque channel id
 typedef uintptr_t channel_id_t;
+
+class PXPrinter;
 
 class PXDriver
 {
@@ -69,6 +71,7 @@ class PXDriver
     typedef std::pair<PXChannel *, expectation_t> expect_handle_t;
     expect_handle_t next_expect () const;
 
+    int make_fd_set (const channel_list_t &channels, fd_set &fds) const;
     bool check_expectations (channel_list_t &channels, channel_id_t *matched);
 
     std::shared_ptr<PXPrinter> printer_;

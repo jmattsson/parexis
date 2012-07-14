@@ -40,15 +40,16 @@ class PXIO
 {
   public:
     explicit PXIO (int fd) : fd_ (fd) {}
+    virtual ~PXIO () {}
 
     virtual char getc ();
     virtual void putc (char c);
 
     // Exception types for getc/putc
-    typedef struct {} EOF;
-    typedef struct {} INTR;
-    typedef struct {} AGAIN;
-    typedef struct {} ERR;
+    typedef struct {} E_EOF;
+    typedef struct {} E_INTR;
+    typedef struct {} E_AGAIN;
+    typedef struct {} E_ERR;
 
     // file descriptor for select() use, not necessarily where data comes from
     int select_fd () { return fd_; }

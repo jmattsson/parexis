@@ -32,10 +32,11 @@
 
 #include "PXDriver.h"
 #include "PXIO.h"
+#include "PXPrinter.h"
 #include <sys/select.h>
 #include <pcre.h>
 
-#define CHID(shptr) (channel_id_t)(shptr).get()
+#define CHID(shptr) reinterpret_cast<channel_id_t>((shptr).get())
 
 namespace ParEx
 {
@@ -52,7 +53,7 @@ PXDriver::addChannel (std::shared_ptr<PXChannel> chan)
 {
   channels_.push_back (chan);
   channel_id_t id = CHID(chan);
-  printer_.addChannel (id);
+  printer_->addChannel (id);
   return id;
 }
 
@@ -61,7 +62,7 @@ void
 PXDriver::removeChannel (channel_id_t chan_id)
 {
   for (auto i = channels_.begin (); i != channels_.end (); ++i)
-    if (i->get () == chan_id)
+    if (CHID(*i) == chan_id)
     {
       channels_.erase (i);
       return;
@@ -69,11 +70,11 @@ PXDriver::removeChannel (channel_id_t chan_id)
 }
 
 
-static bool have_expectations (const expect_set_t &exps)
+static bool have_expectations (const expect_groups_t &exps)
 {
   for (auto i = exps.begin (); i != exps.end (); ++i)
   {
-    if (!(*i)->empty ())
+    if (!i->empty ())
       return true;
   }
   return false;
@@ -84,7 +85,7 @@ bool
 PXDriver::have_expectations () const
 {
   for (auto i = channels_.begin (); i != channels_.end (); ++i)
-    if (have_expectations ((*i)->exps_))
+    if (ParEx::have_expectations ((*i)->exps_))
       return true;
   return false;
 }
@@ -114,12 +115,12 @@ PXDriver::next_expect () const
   expectation_t exp;
   timeval_t next = { INTMAX_MAX, INTMAX_MAX };
   for (auto ch = channels_.begin (); ch != channels_.end (); ++ch)
-    for (auto i = (*ch)->exps_.begin (); i !+ (*ch)->exps_.end (); ++i)
+    for (auto i = (*ch)->exps_.begin (); i != (*ch)->exps_.end (); ++i)
     {
-      if ((*i)->front ().time_left < next)
+      if (i->front ().time_left < next)
       {
-        exp = (*i)->front ();
-        chan = (*i).get ();
+        exp = i->front ();
+        chan = ch->get ();
         next = exp.time_left;
       }
     }
@@ -127,12 +128,13 @@ PXDriver::next_expect () const
 }
 
 
-static int make_fd_set (const PXDriver::channel_list_t &channels, fd_set &fds)
+int
+PXDriver::make_fd_set (const channel_list_t &channels, fd_set &fds) const
 {
   int highest = 0;
   for (auto ch = channels.begin (); ch != channels.end (); ++ch)
   {
-    int fd = (*ch)->select_fd ();
+    int fd = (*ch)->io_->select_fd ();
     if (fd > highest)
       highest = fd;
     FD_SET(fd, &fds);
@@ -145,7 +147,7 @@ static void record_elapsed_time (expect_groups_t &exps, timeval_t elapsed)
 {
   for (auto g = exps.begin (); g != exps.end (); ++g)
   {
-    auto &e = i->front ();
+    auto &e = g->front ();
     if (e.time_left < elapsed)
       e.time_left.tv_usec = e.time_left.tv_sec = 0;
     else
@@ -160,10 +162,12 @@ PXDriver::check_expectations (channel_list_t &channels, channel_id_t *matched)
   bool found = false;
   for (auto ch = channels.begin (); ch != channels.end () && !found; ++ch)
   {
-    string &buf = (*ch)->buffer_;
-    for (auto group = ch->begin (); group != ch->end () && !found; ++group)
+    std::string &buf = (*ch)->buffer_;
+    for (auto group = (*ch)->exps_.begin ();
+        group != (*ch)->exps_.end () && !found;
+        ++group)
     {
-      for (auto e = group->begin (); != group->end (); ++e)
+      for (auto e = group->begin (); e != group->end () && !found; ++e)
       {
         if (e->compiled_regex == NULL)
           e->compiled_regex =
@@ -173,10 +177,13 @@ PXDriver::check_expectations (channel_list_t &channels, channel_id_t *matched)
               NULL, NULL, NULL
             );
 
-        int m[3];
+        unsigned m[3];
         int num = pcre_exec (
-          (pcre *)e->compiled_regex, buf, buf.size (), 0,
-          PCRE_NOTEMPTY | PCRE_NOTEOL, m, 3);
+          static_cast<pcre *>(e->compiled_regex), NULL,
+          buf.c_str (), static_cast<int> (buf.size ()), 0,
+          PCRE_NOTEMPTY | PCRE_NOTEOL,
+          (int *)m,
+          3);
         if (num == 1)
         {
           found = true;
@@ -190,17 +197,17 @@ PXDriver::check_expectations (channel_list_t &channels, channel_id_t *matched)
           break;
         }
       }
-      if (found)
-      {
-        // look for empty lists, and if found clear all expectations on the
-        // channel, as we just satisfied a full chain
-        for (auto e = group->begin (); != group->end (); ++e)
-          if (e->empty ())
-          {
-            (*ch)->clear_expects ();
-            break;
-          }
-      }
+    }
+    if (found)
+    {
+      // look for empty lists, and if found clear all expectations on the
+      // channel, as we just satisfied a full chain
+      for (auto g = (*ch)->exps_.begin (); g != (*ch)->exps_.end (); ++g)
+        if (g->empty ())
+        {
+          (*ch)->clear_expects ();
+          break;
+        }
     }
   }
   return found;
@@ -220,13 +227,13 @@ PXDriver::waitForAny ()
 
   // find next timeout
   expect_handle_t next = next_expect ();
-  timeval_t left = next.time_left, start = next.time_left;
+  timeval_t left = next.second.time_left, start = next.second.time_left;
 
   int num = 0;
   do {
     // Note: we rely on Linux-specific behaviour with updated timevals!
     fd_set fds;
-    num = select (make_fd_set (channels_) +1, &fds, NULL, NULL, &left);
+    num = select (make_fd_set (channels_, fds) +1, &fds, NULL, NULL, &left);
     if (num > 0)
     {
       timeval_t elapsed = start;
@@ -241,7 +248,7 @@ PXDriver::waitForAny ()
       channel_list_t chans_to_check;
       for (auto ch = channels_.begin (); ch != channels_.end (); ++ch)
       {
-        if (FD_ISSET((*ch)->io_->select_fd, &fds))
+        if (FD_ISSET((*ch)->io_->select_fd (), &fds))
         {
           chans_to_check.push_back (*ch);
           try {
@@ -249,9 +256,9 @@ PXDriver::waitForAny ()
             printer_->out (CHID(*ch), c);
             (*ch)->buffer_ += c;
           }
-          catch (const PXIO::AGAIN &ea) {}
-          catch (const PXIO::INTR &ei) {} // throw CANCEL?
-          catch (const PXIO::EOF &eo) {} // printer_.note_eof()?
+          catch (const PXIO::E_AGAIN &ea) {}
+          catch (const PXIO::E_INTR &ei) {} // throw CANCEL?
+          catch (const PXIO::E_EOF &eo) {} // printer_.note_eof()?
         }
       }
 
