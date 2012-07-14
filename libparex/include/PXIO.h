@@ -39,7 +39,7 @@ namespace ParEx
 class PXIO
 {
   public:
-    explicit PXIO (int fd) : fd_ (fd) {}
+    explicit PXIO (int fd);
     virtual ~PXIO () {}
 
     virtual char getc ();

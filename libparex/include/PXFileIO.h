@@ -30,51 +30,20 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _PXFILEIO_H_
+#define _PXFILEIO_H_
+
 #include "PXIO.h"
-#include <unistd.h>
-#include <errno.h>
+#include <string>
 
 namespace ParEx
 {
 
-static void throw_errno ()
+class PXFileIO : public PXIO
 {
-  switch (errno)
-  {
-    case EINTR: throw PXIO::E_INTR ();
-    case EAGAIN: throw PXIO::E_AGAIN ();
-    default: throw PXIO::E_ERR ();
-  }
-}
+  public:
+    explicit PXFileIO (const std::string &fname);
+};
 
-PXIO::PXIO (int fd)
-  : fd_ (fd)
-{
-  if (fd_ < 0)
-    throw PXIO::E_ERR ();
-}
-
-char
-PXIO::getc ()
-{
-  char c;
-  ssize_t ret = read (fd_, &c, 1);
-  if (ret == 0)
-    throw PXIO::E_EOF ();
-  else if (ret < 0)
-    throw_errno ();
-  return c;
-}
-
-
-void
-PXIO::putc (char c)
-{
-  ssize_t ret = write (fd_, &c, 1);
-  if (ret == 0)
-    throw PXIO::E_AGAIN ();
-  else if (ret < 0)
-    throw_errno ();
-}
-
-} // namespace
+} // namespace 
+#endif

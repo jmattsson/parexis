@@ -6,6 +6,7 @@ SRCS= \
 	src/PXChannel.cc \
 	src/PXDriver.cc \
 	src/PXIO.cc \
+	src/PXFileIO.cc \
 
 OBJS=$(SRCS:.cc=.o)
 DEPS=$(SRCS:.cc=.d)
