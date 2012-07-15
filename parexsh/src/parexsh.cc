@@ -25,6 +25,7 @@ void process_open_cmd (argv_t &argv)
     std::shared_ptr<PXChannel> ch (new PXChannel (io, argv[2]));
     channels.push_back (ch);
     ids.push_back (driver.add_channel (ch));
+    std::cout << ids.size () -1 << std::endl;
   }
   else
     throw std::invalid_argument ("bad args");
