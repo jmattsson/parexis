@@ -31,12 +31,13 @@
  */
 
 #include "PXChannel.h"
+#include <pcre.h>
 
 namespace ParEx
 {
 
 PXChannel::PXChannel (std::shared_ptr<PXIO> io)
-  : io_ (io), exps_ (), buffer_ ()
+  : io_ (io), exps_ (), buffer_ (), last_match_ ()
 {
   // Empty
 }
@@ -62,5 +63,56 @@ PXChannel::clear_expects ()
   expect_groups_t tmp;
   exps_.swap (tmp);
 }
+
+
+bool
+PXChannel::expectation_met ()
+{
+  bool found = false;
+  for (auto g = exps_.begin (); g != exps_.end () && !found; ++g)
+  {
+    for (auto e = g->begin (); e != g->end () && !found; ++e)
+    {
+      if (e->compiled_regex == NULL)
+        e->compiled_regex =
+          pcre_compile (
+            e->expr.c_str (),
+            PCRE_MULTILINE | PCRE_NEWLINE_ANY | PCRE_NO_AUTO_CAPTURE,
+            NULL, NULL, NULL
+          );
+
+      unsigned m[3];
+      int num = pcre_exec (
+        static_cast<pcre *>(e->compiled_regex), NULL,
+        buffer_.c_str (), static_cast<int> (buffer_.size ()), 0,
+        PCRE_NOTEMPTY | PCRE_NOTEOL,
+        (int *)m,
+        3);
+      if (num == 1)
+      {
+        found = true;
+        last_match_ = buffer_.substr (m[0], m[1]-m[0]);
+        // consume used data and expectation
+        buffer_ = buffer_.substr (m[1]);
+        pcre_free (e->compiled_regex);
+        g->erase (e);
+        break;
+      }
+    }
+  }
+  if (found)
+  {
+    // look for empty lists, and if found clear all expectations on the
+    // channel, as we just satisfied a full chain
+    for (auto g = exps_.begin (); g != exps_.end (); ++g)
+      if (g->empty ())
+      {
+        clear_expects ();
+        break;
+      }
+  }
+  return found;
+}
+
 
 } // namespace

@@ -53,12 +53,12 @@ class PXDriver
   public:
     explicit PXDriver (std::shared_ptr<PXPrinter> printer);
 
-    channel_id_t addChannel (std::shared_ptr<PXChannel> chan);
-    void         removeChannel (channel_id_t chan_id);
+    channel_id_t add_channel (std::shared_ptr<PXChannel> chan);
+    void         remove_channel (channel_id_t chan_id);
 
-    void         waitForAll ();
-    void         waitForOne (channel_id_t chan_id);
-    channel_id_t waitForAny ();
+    void         wait_for_all ();
+    void         wait_for_one (channel_id_t chan_id);
+    channel_id_t wait_for_any ();
 
     // Exception type for the waitXxx functions
     typedef struct {} TIMEOUT;

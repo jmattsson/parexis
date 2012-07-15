@@ -84,7 +84,15 @@ class expectation_t
     expectation_t &operator = (const expectation_t &b)
     {
       expectation_t tmp (b);
-      std::swap (*this, tmp);
+      tmp.swap (*this);
+      return *this;
+    }
+    expectation_t &swap (expectation_t &b)
+    {
+      expr.swap (b.expr);
+      std::swap (timeout, b.timeout);
+      std::swap (time_left, b.time_left);
+      std::swap (compiled_regex, b.compiled_regex);
       return *this;
     }
 };
@@ -109,11 +117,17 @@ class PXChannel
 
     void write (const std::string &str);
 
+    const std::string &last_match () const { return last_match_; }
+
   private:
     friend class PXDriver;
+
+    bool expectation_met ();
+
     std::shared_ptr<PXIO> io_;
     expect_groups_t exps_;
     std::string buffer_;
+    std::string last_match_;
 };
 
 

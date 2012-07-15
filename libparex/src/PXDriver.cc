@@ -38,6 +38,10 @@
 
 #define CHID(shptr) reinterpret_cast<channel_id_t>((shptr).get())
 
+static void nowarn_FD_ZERO(fd_set &);
+static void nowarn_FD_SET(int, fd_set &);
+static bool nowarn_FD_ISSET(int, fd_set &);
+
 namespace ParEx
 {
 
@@ -49,17 +53,17 @@ PXDriver::PXDriver (std::shared_ptr<PXPrinter> printer)
 
 
 channel_id_t
-PXDriver::addChannel (std::shared_ptr<PXChannel> chan)
+PXDriver::add_channel (std::shared_ptr<PXChannel> chan)
 {
   channels_.push_back (chan);
   channel_id_t id = CHID(chan);
-  printer_->addChannel (id);
+  printer_->add_channel (id);
   return id;
 }
 
 
 void
-PXDriver::removeChannel (channel_id_t chan_id)
+PXDriver::remove_channel (channel_id_t chan_id)
 {
   for (auto i = channels_.begin (); i != channels_.end (); ++i)
     if (CHID(*i) == chan_id)
@@ -67,6 +71,7 @@ PXDriver::removeChannel (channel_id_t chan_id)
       channels_.erase (i);
       return;
     }
+  printer_->remove_channel (chan_id);
 }
 
 
@@ -92,18 +97,18 @@ PXDriver::have_expectations () const
 
 
 void
-PXDriver::waitForAll ()
+PXDriver::wait_for_all ()
 {
   while (have_expectations ())
-    waitForAny ();
+    wait_for_any ();
 }
 
 
 void
-PXDriver::waitForOne (channel_id_t chan_id)
+PXDriver::wait_for_one (channel_id_t chan_id)
 {
   while (have_expectations ())
-    if (waitForAny () == chan_id)
+    if (wait_for_any () == chan_id)
       break;
 }
 
@@ -137,7 +142,7 @@ PXDriver::make_fd_set (const channel_list_t &channels, fd_set &fds) const
     int fd = (*ch)->io_->select_fd ();
     if (fd > highest)
       highest = fd;
-    FD_SET(fd, &fds);
+    nowarn_FD_SET(fd, fds);
   }
   return highest;
 }
@@ -159,63 +164,21 @@ static void record_elapsed_time (expect_groups_t &exps, timeval_t elapsed)
 bool
 PXDriver::check_expectations (channel_list_t &channels, channel_id_t *matched)
 {
-  bool found = false;
-  for (auto ch = channels.begin (); ch != channels.end () && !found; ++ch)
+  for (auto ch = channels.begin (); ch != channels.end (); ++ch)
   {
-    std::string &buf = (*ch)->buffer_;
-    for (auto group = (*ch)->exps_.begin ();
-        group != (*ch)->exps_.end () && !found;
-        ++group)
+    if ((*ch)->expectation_met ())
     {
-      for (auto e = group->begin (); e != group->end () && !found; ++e)
-      {
-        if (e->compiled_regex == NULL)
-          e->compiled_regex =
-            pcre_compile (
-              e->expr.c_str (),
-              PCRE_MULTILINE | PCRE_NEWLINE_ANY | PCRE_NO_AUTO_CAPTURE,
-              NULL, NULL, NULL
-            );
-
-        unsigned m[3];
-        int num = pcre_exec (
-          static_cast<pcre *>(e->compiled_regex), NULL,
-          buf.c_str (), static_cast<int> (buf.size ()), 0,
-          PCRE_NOTEMPTY | PCRE_NOTEOL,
-          (int *)m,
-          3);
-        if (num == 1)
-        {
-          found = true;
-          *matched = CHID(*ch);
-          printer_->matched (CHID(*ch), buf.substr (m[0], m[1]-m[0]));
-          printer_->flush ();
-          // consume used data and expectation
-          buf = buf.substr (m[1]);
-          pcre_free (e->compiled_regex);
-          group->erase (e);
-          break;
-        }
-      }
-    }
-    if (found)
-    {
-      // look for empty lists, and if found clear all expectations on the
-      // channel, as we just satisfied a full chain
-      for (auto g = (*ch)->exps_.begin (); g != (*ch)->exps_.end (); ++g)
-        if (g->empty ())
-        {
-          (*ch)->clear_expects ();
-          break;
-        }
+      *matched = CHID(*ch);
+      printer_->matched (CHID(*ch), (*ch)->last_match ());
+      return true;
     }
   }
-  return found;
+  return false;
 }
 
 
 channel_id_t
-PXDriver::waitForAny ()
+PXDriver::wait_for_any ()
 {
   if (!have_expectations ())
     throw TIMEOUT (); // we'd be waiting for eternity otherwise...
@@ -233,6 +196,7 @@ PXDriver::waitForAny ()
   do {
     // Note: we rely on Linux-specific behaviour with updated timevals!
     fd_set fds;
+    nowarn_FD_ZERO(fds);
     num = select (make_fd_set (channels_, fds) +1, &fds, NULL, NULL, &left);
     if (num > 0)
     {
@@ -248,7 +212,7 @@ PXDriver::waitForAny ()
       channel_list_t chans_to_check;
       for (auto ch = channels_.begin (); ch != channels_.end (); ++ch)
       {
-        if (FD_ISSET((*ch)->io_->select_fd (), &fds))
+        if (nowarn_FD_ISSET((*ch)->io_->select_fd (), fds))
         {
           chans_to_check.push_back (*ch);
           try {
@@ -271,12 +235,27 @@ PXDriver::waitForAny ()
     else
       if (errno == EINTR)
         num = 1; // fib it and loop again, timeout was updated so it's all good
-  } while (num > 0);
+  } while (num > 0 && (left.tv_sec || left.tv_usec));
 
   printer_->timedout (
     (channel_id_t)next.first, next.second.expr, next.second.timeout);
+  printer_->flush ();
   throw TIMEOUT ();
 }
 
 
 } // namespace
+
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+static void nowarn_FD_ZERO(fd_set &fds)
+{
+  FD_ZERO(&fds);
+}
+static void nowarn_FD_SET(int fd, fd_set &fds)
+{
+  FD_SET(fd, &fds);
+}
+static bool nowarn_FD_ISSET(int fd, fd_set &fds)
+{
+  return FD_ISSET(fd, &fds);
+}

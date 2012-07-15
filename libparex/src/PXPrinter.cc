@@ -30,28 +30,11 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _PXPRINTER_H_
-#define _PXPRINTER_H_
-
-#include "PXDriver.h"
+#include "PXPrinter.h"
 
 namespace ParEx
 {
 
-class PXPrinter
-{
-  public:
-    virtual ~PXPrinter ();
-
-    virtual void add_channel (channel_id_t chan_id) = 0;
-    virtual void remove_channel (channel_id_t chan_id) = 0;
-
-    virtual void out (channel_id_t chan_id, char c) = 0;
-    virtual void matched (channel_id_t chan_id, const std::string &str) = 0;
-    virtual void timedout (channel_id_t chan_id, const std::string &expr, timeval_t timeout) = 0;
-
-    virtual void flush () = 0;
-};
+PXPrinter::~PXPrinter () {}
 
 } // namespace
-#endif

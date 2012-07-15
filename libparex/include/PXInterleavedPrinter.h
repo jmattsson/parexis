@@ -30,28 +30,49 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _PXPRINTER_H_
-#define _PXPRINTER_H_
+#ifndef _PXINTERLEAVEDPRINTER_H_
+#define _PXINTERLEAVEDPRINTER_H_
 
-#include "PXDriver.h"
+#include "PXPrinter.h"
+#include <cstdio>
 
 namespace ParEx
 {
 
-class PXPrinter
+class PXInterleavedPrinter : public PXPrinter
 {
   public:
-    virtual ~PXPrinter ();
+    explicit PXInterleavedPrinter (FILE *fil);
 
-    virtual void add_channel (channel_id_t chan_id) = 0;
-    virtual void remove_channel (channel_id_t chan_id) = 0;
+    virtual void add_channel (channel_id_t chan_id);
+    virtual void remove_channel (channel_id_t chan_id);
+    
+    virtual void out (channel_id_t chan_id, char c);
+    virtual void matched (channel_id_t chan_id, const std::string &str);
+    virtual void timedout (channel_id_t chan_id, const std::string &expr, timeval_t timeout);
 
-    virtual void out (channel_id_t chan_id, char c) = 0;
-    virtual void matched (channel_id_t chan_id, const std::string &str) = 0;
-    virtual void timedout (channel_id_t chan_id, const std::string &expr, timeval_t timeout) = 0;
+    virtual void flush ();
 
-    virtual void flush () = 0;
+  protected:
+    virtual std::string line_prefix () const;
+    virtual std::string hilight_match (const std::string &str) const;
+    virtual std::string hilight_timeout (const std::string &str) const;
+
+  private:
+    PXInterleavedPrinter (const PXInterleavedPrinter &);
+    PXInterleavedPrinter &operator = (const PXInterleavedPrinter &);
+
+    typedef struct {
+      channel_id_t chid;
+      std::string buffer;
+    } chan_buf_t;
+    typedef std::vector<chan_buf_t> chan_vec_t;
+
+    chan_buf_t *find_buf (channel_id_t chid);
+
+    chan_vec_t bufs_;
+    FILE *out_;
 };
 
-} // namespace
+} // namespaec
 #endif

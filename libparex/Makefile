@@ -5,12 +5,15 @@ include ../mk/c_c++rules.mk
 SRCS= \
 	src/PXChannel.cc \
 	src/PXDriver.cc \
+	src/PXPrinter.cc \
 	src/PXIO.cc \
 	src/PXFileIO.cc \
+	src/PXInterleavedPrinter.cc \
 
 OBJS=$(SRCS:.cc=.o)
 DEPS=$(SRCS:.cc=.d)
 
+CXXFLAGS+=-g
 LDFLAGS+=-lpcre
 
 libparex.so: $(OBJS)
