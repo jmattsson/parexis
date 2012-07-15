@@ -53,8 +53,8 @@ DEPEND.c =@sed -i -e 's,$@[ :]*\(.*\),$@ : $$\(wildcard \1,g' -e '$$ s/\(.*\)/\1
 DEPEND.cc=$(DEPEND.c)
 
 # Linking of shared libs and binaries.
-LINK.so=$Q$(CXX) $(ACTUAL_LDFLAGS) -shared -o $@ $^
-LINK.ld=$Q$(CXX) $(ACTUAL_LDFLAGS) -o $@ $(filter-out %.so, $^)
+LINK.so=$Q$(CXX) $^ $(ACTUAL_LDFLAGS) -shared -z defs -z text -o $@
+LINK.ld=$Q$(CXX) $(filter-out %.so, $^) $(ACTUAL_LDFLAGS) -o $@
 
 # Pattern rules for C, C++, shared libs (and .executables)
 .PRECIOUS: %.o
