@@ -185,9 +185,11 @@ PXDriver::wait_for_any ()
     timeval_t now;
     gettimeofday (&now, NULL);
     left = next.second.expiry;
-    left -= now;
+    if (now < next.second.expiry)
+      left -= now;
+    else
+      left = { 0, 0 };
 
-    // Note: we rely on Linux-specific behaviour with updated timevals!
     fd_set fds;
     nowarn_FD_ZERO(fds);
     num = select (make_fd_set (channels_, fds) +1, &fds, NULL, NULL, &left);
