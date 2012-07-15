@@ -55,7 +55,10 @@ void process_wait (argv_t &argv)
   else if (argv[1] == "any")
     driver.wait_for_any ();
   else
+  {
     driver.wait_for_one (ids.at (stoul (argv[1])));
+    std::cout << channels.at (stoul (argv[1]))->last_match () << std::endl;
+  }
 }
 
 argv_t split_line (std::string &line)
