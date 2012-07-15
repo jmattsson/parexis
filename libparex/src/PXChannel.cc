@@ -77,13 +77,21 @@ PXChannel::expectation_met ()
   {
     for (auto e = g->begin (); e != g->end () && !found; ++e)
     {
+      const char *err = NULL;
+      int erroffset = 0;
       if (e->compiled_regex == NULL)
         e->compiled_regex =
           pcre_compile (
             e->expr.c_str (),
             PCRE_MULTILINE | PCRE_NEWLINE_ANY | PCRE_NO_AUTO_CAPTURE,
-            NULL, NULL, NULL
+            &err, &erroffset, NULL
           );
+      if (!e->compiled_regex)
+      {
+        fprintf(stderr, "invalid regex '%s' (at %d): %s\n",
+          e->expr.c_str (), erroffset, err);
+        throw E_REGEX ();
+      }
 
       unsigned m[3];
       int num = pcre_exec (

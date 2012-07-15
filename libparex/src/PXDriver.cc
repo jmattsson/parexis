@@ -209,7 +209,7 @@ PXDriver::wait_for_any ()
           }
           catch (const PXIO::E_AGAIN &ea) {}
           catch (const PXIO::E_INTR &ei) {} // throw CANCEL?
-          catch (const PXIO::E_EOF &eo) {} // printer_.note_eof()?
+          catch (const PXIO::E_EOF &eo) {} // remove channel?
         }
       }
 
@@ -221,7 +221,7 @@ PXDriver::wait_for_any ()
     }
     else
       if (errno == EINTR)
-        num = 1; // fib it and loop again, timeout was updated so it's all good
+        num = 1; // fib it and loop again
   } while (num > 0 && (left.tv_sec || left.tv_usec));
 
   printer_->timedout (

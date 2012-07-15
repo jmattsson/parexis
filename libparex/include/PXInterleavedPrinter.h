@@ -43,6 +43,7 @@ class PXInterleavedPrinter : public PXPrinter
 {
   public:
     explicit PXInterleavedPrinter (FILE *fil);
+    ~PXInterleavedPrinter ();
 
     virtual void add_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel);
     virtual void remove_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel);

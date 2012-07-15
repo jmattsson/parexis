@@ -44,6 +44,22 @@ PXInterleavedPrinter::PXInterleavedPrinter (FILE *fil)
 }
 
 
+PXInterleavedPrinter::~PXInterleavedPrinter ()
+{
+  for_each (bufs_.begin (), bufs_.end (),
+    [&](chan_buf_t &b) {
+        std::string p = line_prefix ();
+        fwrite (p.c_str (), p.size (), 1, out_);
+        const std::string &name = b.channel->name ();
+        fwrite (name.c_str (), name.size (), 1, out_);
+        fwrite ("> ", 2, 1, out_);
+        fwrite (b.buffer.c_str (), b.buffer.size (), 1, out_);
+        fwrite ("\n", 1, 1, out_); // append eol
+    });
+  fflush (out_);
+}
+
+
 void
 PXInterleavedPrinter::add_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel)
 {
@@ -125,13 +141,13 @@ PXInterleavedPrinter::flush ()
         fwrite (name.c_str (), name.size (), 1, out_);
         fwrite ("> ", 2, 1, out_);
         fwrite (b.buffer.c_str (), pos +1, 1, out_);
-        fflush (out_);
 
         b.buffer = b.buffer.substr (pos +1);
 
         pos = b.buffer.find ('\n');
       }
     });
+  fflush (out_);
 }
 
 

@@ -130,6 +130,8 @@ class PXChannel
     const std::string &name () const { return name_; }
     const std::string &last_match () const { return last_match_; }
 
+    // exception class for signalling a bad regex
+    typedef struct {} E_REGEX;
   private:
     friend class PXDriver;
 
