@@ -32,12 +32,13 @@
 
 #include "PXChannel.h"
 #include <pcre.h>
+#include <sys/time.h>
 
 namespace ParEx
 {
 
-PXChannel::PXChannel (std::shared_ptr<PXIO> io)
-  : io_ (io), exps_ (), buffer_ (), last_match_ ()
+PXChannel::PXChannel (std::shared_ptr<PXIO> io, const std::string &chname)
+  : io_ (io), exps_ (), name_ (chname), buffer_ (), last_match_ ()
 {
   // Empty
 }
@@ -46,7 +47,10 @@ PXChannel::PXChannel (std::shared_ptr<PXIO> io)
 void
 PXChannel::add_expect(const std::string &expr, timeval_t timeout, exp_type_t et)
 {
-  expectation_t exp (expr, timeout);
+  timeval_t expiry;
+  gettimeofday (&expiry, NULL);
+  expiry += timeout;
+  expectation_t exp (expr, timeout, expiry, NULL);
   if (et == PXPARALLEL || exps_.empty ())
   {
     expect_list_t el = { exp };

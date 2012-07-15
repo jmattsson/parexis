@@ -63,23 +63,33 @@ static inline timeval_t &operator -= (timeval_t &a, const timeval_t &b)
   return a;
 }
 
+static inline timeval_t &operator += (timeval_t &a, const timeval_t &b)
+{
+  a.tv_sec += b.tv_sec;
+  a.tv_usec += b.tv_usec;
+  while (a.tv_usec > 1000000)
+  {
+    ++a.tv_sec;
+    a.tv_usec -= 1000000;
+  }
+  return a;
+}
+
 
 class expectation_t
 {
   public:
     std::string expr;
     timeval_t timeout;
-    timeval_t time_left;
+    timeval_t expiry;
     void *compiled_regex;
 
     expectation_t ()
-      : expr (), timeout (), time_left (), compiled_regex (NULL) {}
-    expectation_t (const std::string &e, timeval_t t)
-      : expr (e), timeout (t), time_left (t), compiled_regex (NULL) {}
+      : expr (), timeout (), expiry (), compiled_regex (NULL) {}
     expectation_t (const std::string &e, timeval_t t, timeval_t l, void *p)
-      : expr (e), timeout (t), time_left (l), compiled_regex (p) {}
+      : expr (e), timeout (t), expiry (l), compiled_regex (p) {}
     expectation_t (const expectation_t &b)
-      : expr (b.expr), timeout (b.timeout), time_left (b.time_left),
+      : expr (b.expr), timeout (b.timeout), expiry (b.expiry),
         compiled_regex (b.compiled_regex) {}
     expectation_t &operator = (const expectation_t &b)
     {
@@ -91,7 +101,7 @@ class expectation_t
     {
       expr.swap (b.expr);
       std::swap (timeout, b.timeout);
-      std::swap (time_left, b.time_left);
+      std::swap (expiry, b.expiry);
       std::swap (compiled_regex, b.compiled_regex);
       return *this;
     }
@@ -110,13 +120,14 @@ class PXIO;
 class PXChannel
 {
   public:
-    explicit PXChannel (std::shared_ptr<PXIO> io);
+    PXChannel (std::shared_ptr<PXIO> io, const std::string &name);
 
     void add_expect (const std::string &expr, timeval_t timeout, exp_type_t et);
     void clear_expects ();
 
     void write (const std::string &str);
 
+    const std::string &name () const { return name_; }
     const std::string &last_match () const { return last_match_; }
 
   private:
@@ -126,6 +137,7 @@ class PXChannel
 
     std::shared_ptr<PXIO> io_;
     expect_groups_t exps_;
+    std::string name_;
     std::string buffer_;
     std::string last_match_;
 };

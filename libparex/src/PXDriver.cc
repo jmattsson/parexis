@@ -34,6 +34,7 @@
 #include "PXIO.h"
 #include "PXPrinter.h"
 #include <sys/select.h>
+#include <sys/time.h>
 #include <pcre.h>
 
 #define CHID(shptr) reinterpret_cast<channel_id_t>((shptr).get())
@@ -57,7 +58,7 @@ PXDriver::add_channel (std::shared_ptr<PXChannel> chan)
 {
   channels_.push_back (chan);
   channel_id_t id = CHID(chan);
-  printer_->add_channel (id);
+  printer_->add_channel (id, chan);
   return id;
 }
 
@@ -68,10 +69,10 @@ PXDriver::remove_channel (channel_id_t chan_id)
   for (auto i = channels_.begin (); i != channels_.end (); ++i)
     if (CHID(*i) == chan_id)
     {
+      printer_->remove_channel (chan_id, *i);
       channels_.erase (i);
       return;
     }
-  printer_->remove_channel (chan_id);
 }
 
 
@@ -122,11 +123,11 @@ PXDriver::next_expect () const
   for (auto ch = channels_.begin (); ch != channels_.end (); ++ch)
     for (auto i = (*ch)->exps_.begin (); i != (*ch)->exps_.end (); ++i)
     {
-      if (i->front ().time_left < next)
+      if (i->front ().expiry < next)
       {
         exp = i->front ();
         chan = ch->get ();
-        next = exp.time_left;
+        next = exp.expiry;
       }
     }
   return std::make_pair (chan, exp);
@@ -145,19 +146,6 @@ PXDriver::make_fd_set (const channel_list_t &channels, fd_set &fds) const
     nowarn_FD_SET(fd, fds);
   }
   return highest;
-}
-
-
-static void record_elapsed_time (expect_groups_t &exps, timeval_t elapsed)
-{
-  for (auto g = exps.begin (); g != exps.end (); ++g)
-  {
-    auto &e = g->front ();
-    if (e.time_left < elapsed)
-      e.time_left.tv_usec = e.time_left.tv_sec = 0;
-    else
-      e.time_left -= elapsed;
-  }
 }
 
 
@@ -190,24 +178,21 @@ PXDriver::wait_for_any ()
 
   // find next timeout
   expect_handle_t next = next_expect ();
-  timeval_t left = next.second.time_left, start = next.second.time_left;
 
   int num = 0;
+  timeval_t left;
   do {
+    timeval_t now;
+    gettimeofday (&now, NULL);
+    left = next.second.expiry;
+    left -= now;
+
     // Note: we rely on Linux-specific behaviour with updated timevals!
     fd_set fds;
     nowarn_FD_ZERO(fds);
     num = select (make_fd_set (channels_, fds) +1, &fds, NULL, NULL, &left);
     if (num > 0)
     {
-      timeval_t elapsed = start;
-      elapsed -= left;
-      start = left;
-
-      // record elapsed time before we start read attempts
-      for (auto ch = channels_.begin (); ch != channels_.end (); ++ch)
-        record_elapsed_time ((*ch)->exps_, elapsed);
-
       // read any available data into match buffers
       channel_list_t chans_to_check;
       for (auto ch = channels_.begin (); ch != channels_.end (); ++ch)

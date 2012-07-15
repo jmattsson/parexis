@@ -45,19 +45,21 @@ PXInterleavedPrinter::PXInterleavedPrinter (FILE *fil)
 
 
 void
-PXInterleavedPrinter::add_channel (channel_id_t chan_id)
+PXInterleavedPrinter::add_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel)
 {
-  chan_buf_t buf = { chan_id, "" };
+  chan_buf_t buf = { chan_id, channel, "" };
   bufs_.push_back (buf);
 }
 
 
 void
-PXInterleavedPrinter::remove_channel (channel_id_t chan_id)
+PXInterleavedPrinter::remove_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel)
 {
+  // TODO: remove - the below comment no longer reflects reality
   // We don't remove channels since that would mess up the channel indexes
   // and yield very confusing output
   (void)chan_id;
+  (void)channel;
 }
 
 
@@ -119,6 +121,9 @@ PXInterleavedPrinter::flush ()
       {
         std::string p = line_prefix ();
         fwrite (p.c_str (), p.size (), 1, out_);
+        const std::string &name = b.channel->name ();
+        fwrite (name.c_str (), name.size (), 1, out_);
+        fwrite ("> ", 2, 1, out_);
         fwrite (b.buffer.c_str (), pos +1, 1, out_);
         fflush (out_);
 

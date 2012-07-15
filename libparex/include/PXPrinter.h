@@ -43,8 +43,8 @@ class PXPrinter
   public:
     virtual ~PXPrinter ();
 
-    virtual void add_channel (channel_id_t chan_id) = 0;
-    virtual void remove_channel (channel_id_t chan_id) = 0;
+    virtual void add_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel) = 0;
+    virtual void remove_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel) = 0;
 
     virtual void out (channel_id_t chan_id, char c) = 0;
     virtual void matched (channel_id_t chan_id, const std::string &str) = 0;

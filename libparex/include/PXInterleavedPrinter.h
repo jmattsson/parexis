@@ -44,8 +44,8 @@ class PXInterleavedPrinter : public PXPrinter
   public:
     explicit PXInterleavedPrinter (FILE *fil);
 
-    virtual void add_channel (channel_id_t chan_id);
-    virtual void remove_channel (channel_id_t chan_id);
+    virtual void add_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel);
+    virtual void remove_channel (channel_id_t chan_id, std::shared_ptr<PXChannel> channel);
     
     virtual void out (channel_id_t chan_id, char c);
     virtual void matched (channel_id_t chan_id, const std::string &str);
@@ -64,6 +64,7 @@ class PXInterleavedPrinter : public PXPrinter
 
     typedef struct {
       channel_id_t chid;
+      std::shared_ptr<PXChannel> channel;
       std::string buffer;
     } chan_buf_t;
     typedef std::vector<chan_buf_t> chan_vec_t;
