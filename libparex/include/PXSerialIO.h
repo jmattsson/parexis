@@ -30,58 +30,35 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _PXSERIALIO_H_
+#define _PXSERIALIO_H_
+
 #include "PXIO.h"
-#include <unistd.h>
-#include <errno.h>
+#include <string>
+#include <cstdint>
+#include "termios.h"
 
 namespace ParEx
 {
 
-static void throw_errno ()
+typedef enum { NO_PARITY, PARITY_EVEN, PARITY_ODD } parity_t;
+
+class PXSerialIO : public PXIO
 {
-  switch (errno)
-  {
-    case EINTR: throw PXIO::E_INTR ();
-    case EAGAIN: throw PXIO::E_AGAIN ();
-    default: throw PXIO::E_ERR ();
-  }
-}
+  public:
+    PXSerialIO (const std::string &dev, speed_t br, bool only_7_bits, parity_t par, bool two_stop_bits);
 
+    virtual void reopen ();
 
-PXIO::PXIO (int fd)
-  : fd_ (fd)
-{
-  // Empty
-}
+  private:
+    int open ();
 
+    std::string dev_;
+    speed_t br_;
+    bool seven_;
+    parity_t par_;
+    bool stops_;
+};
 
-PXIO::~PXIO ()
-{
-  close (fd_);
-}
-
-
-char
-PXIO::getc ()
-{
-  char c;
-  ssize_t ret = read (fd_, &c, 1);
-  if (ret == 0)
-    throw PXIO::E_EOF ();
-  else if (ret < 0)
-    throw_errno ();
-  return c;
-}
-
-
-void
-PXIO::putc (char c)
-{
-  ssize_t ret = write (fd_, &c, 1);
-  if (ret == 0)
-    throw PXIO::E_AGAIN ();
-  else if (ret < 0)
-    throw_errno ();
-}
-
-} // namespace
+} // namespace 
+#endif

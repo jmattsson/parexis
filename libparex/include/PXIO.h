@@ -40,12 +40,14 @@ class PXIO
 {
   public:
     explicit PXIO (int fd);
-    virtual ~PXIO () {}
+    virtual ~PXIO ();
 
     virtual char getc ();
     virtual void putc (char c);
 
-    // Exception types for getc/putc
+    virtual void reopen () = 0;
+
+    // Exception types for getc/putc/reopen
     typedef struct {} E_EOF;
     typedef struct {} E_INTR;
     typedef struct {} E_AGAIN;

@@ -8,6 +8,7 @@ SRCS= \
 	src/PXPrinter.cc \
 	src/PXIO.cc \
 	src/PXFileIO.cc \
+	src/PXSerialIO.cc \
 	src/PXInterleavedPrinter.cc \
 
 OBJS=$(SRCS:.cc=.o)

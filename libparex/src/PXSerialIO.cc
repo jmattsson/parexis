@@ -30,58 +30,87 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "PXIO.h"
-#include <unistd.h>
+#include "PXSerialIO.h"
+#include <cstring>
 #include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+namespace
+{
+using namespace ParEx;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+bool
+cfg_serial (int fd, speed_t br_key, bool only_7_bits, parity_t parity, bool two_stop_bits)
+{
+  struct termios tty;
+  memset (&tty, 0, sizeof tty);
+  if (tcgetattr (fd, &tty) != 0)
+    return false;
+
+  cfmakeraw (&tty);
+
+  cfsetospeed (&tty, br_key);
+  cfsetispeed (&tty, br_key);
+
+  tty.c_cc[VMIN]  = 0;
+  tty.c_cc[VTIME] = 0;
+
+  tty.c_cflag &= ~CRTSCTS;
+  tty.c_cflag |= CLOCAL | CREAD;
+
+  if (parity == PARITY_EVEN)
+    tty.c_cflag |= PARENB;
+  else if (parity == PARITY_ODD)
+    tty.c_cflag |= PARENB | PARODD;
+
+  if (only_7_bits)
+    tty.c_cflag &= ~CS8;
+
+  if (two_stop_bits)
+    tty.c_cflag |= CSTOPB;
+  else
+    tty.c_cflag &= ~CSTOPB;
+
+  if (tcsetattr (fd, TCSANOW, &tty) != 0)
+    return false;
+
+  return true;
+}
+#pragma GCC diagnostic pop
+
+} // anon
 
 namespace ParEx
 {
 
-static void throw_errno ()
+PXSerialIO::PXSerialIO (const std::string &dev, speed_t br_key, bool only_7_bits, parity_t par, bool two_stop_bits)
+  : PXIO (-1),
+    dev_ (dev),
+    br_ (br_key), seven_ (only_7_bits), par_ (par), stops_ (two_stop_bits)
 {
-  switch (errno)
-  {
-    case EINTR: throw PXIO::E_INTR ();
-    case EAGAIN: throw PXIO::E_AGAIN ();
-    default: throw PXIO::E_ERR ();
-  }
-}
-
-
-PXIO::PXIO (int fd)
-  : fd_ (fd)
-{
-  // Empty
-}
-
-
-PXIO::~PXIO ()
-{
-  close (fd_);
-}
-
-
-char
-PXIO::getc ()
-{
-  char c;
-  ssize_t ret = read (fd_, &c, 1);
-  if (ret == 0)
-    throw PXIO::E_EOF ();
-  else if (ret < 0)
-    throw_errno ();
-  return c;
+  fd_ = open ();
 }
 
 
 void
-PXIO::putc (char c)
+PXSerialIO::reopen ()
 {
-  ssize_t ret = write (fd_, &c, 1);
-  if (ret == 0)
-    throw PXIO::E_AGAIN ();
-  else if (ret < 0)
-    throw_errno ();
+  int fd = open ();
+  close (fd_);
+  fd_ = fd;
+}
+
+
+int
+PXSerialIO::open ()
+{
+  int fd = ::open (dev_.c_str (), O_RDWR);
+  if (fd < 0 || !cfg_serial (fd, br_, seven_, par_, stops_))
+    throw E_ERR ();
+  return fd;
 }
 
 } // namespace

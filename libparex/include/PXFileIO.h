@@ -43,6 +43,11 @@ class PXFileIO : public PXIO
 {
   public:
     explicit PXFileIO (const std::string &fname);
+
+    virtual void reopen ();
+
+  private:
+    std::string fname_;
 };
 
 } // namespace 
