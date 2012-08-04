@@ -31,6 +31,7 @@
  */
 
 #include "PXChannel.h"
+#include "PXIO.h"
 #include <pcre.h>
 #include <sys/time.h>
 
@@ -126,5 +127,12 @@ PXChannel::expectation_met ()
   return found;
 }
 
+
+void
+PXChannel::write (const std::string &str)
+{
+  for (auto i = str.begin (); i != str.end (); ++i)
+    io_->putc (*i);
+}
 
 } // namespace
