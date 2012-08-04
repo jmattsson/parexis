@@ -2,6 +2,7 @@
 #include "PXChannel.h"
 #include "PXInterleavedPrinter.h"
 #include "PXFileIO.h"
+#include "PXSerialIO.h"
 #include <cstdio>
 #include <iostream>
 #include <stdexcept>
@@ -17,18 +18,46 @@ PXDriver driver (printer);
 std::vector<std::shared_ptr<PXChannel> > channels;
 std::vector<channel_id_t> ids;
 
+speed_t convert_speed (int spd)
+{
+  switch (spd)
+  {
+    case 1200: return B1200;
+    case 2400: return B2400;
+    case 4800: return B4800;
+    case 9600: return B9600;
+    case 19200: return B19200;
+    case 38400: return B38400;
+    case 57600: return B57600;
+    case 115200: return B115200;
+    case 230400: return B230400;
+    default: return B0;
+  }
+}
+
 void process_open_cmd (argv_t &argv)
 {
+  std::shared_ptr<PXIO> io;
+
   if (argv[1] == "file" && argv.size () == 4)
+    io.reset (new PXFileIO (argv[3]));
+  else if (argv[1] == "serial" && argv.size () == 6 && argv[5].size () == 3)
   {
-    std::shared_ptr<PXIO> io (new PXFileIO (argv[3]));
-    std::shared_ptr<PXChannel> ch (new PXChannel (io, argv[2]));
-    channels.push_back (ch);
-    ids.push_back (driver.add_channel (ch));
-    std::cout << ids.size () -1 << std::endl;
+    // serial <channel> <device> <speed> <[78][NOE][12]>
+    io.reset (new PXSerialIO (
+        argv[3],
+        convert_speed (stoi (argv[4])),
+        argv[5][0] == '7',
+        argv[5][1] == 'O' ? PARITY_ODD : argv[5][1] == 'E' ? PARITY_EVEN : NO_PARITY,
+        argv[5][2] == '2'));
   }
   else
     throw std::invalid_argument ("bad args");
+
+  std::shared_ptr<PXChannel> ch (new PXChannel (io, argv[2]));
+  channels.push_back (ch);
+  ids.push_back (driver.add_channel (ch));
+  std::cout << ids.size () -1 << std::endl;
 }
 
 void process_expect (argv_t &argv, bool parallel)
@@ -62,47 +91,75 @@ void process_wait (argv_t &argv)
   }
 }
 
+void process_write (argv_t &argv)
+{
+  if (argv.size () == 3)
+    channels.at (stoul (argv[1]))->write (argv[2]);
+  else
+    throw std::invalid_argument ("bad args");
+}
+
+char unescape (char c)
+{
+  switch (c)
+  {
+    case 'n': return '\n';
+    case 'r': return '\r';
+    case 't': return '\t';
+    case 'b': return '\b';
+    case 'a': return '\a';
+    case 'f': return '\f';
+    case 'v': return '\v';
+    default: return c;
+  }
+}
+
 argv_t split_line (std::string &line)
 {
   argv_t argv;
-  bool in_quote = false;
-  std::string::size_type last, cap, pos = line.find_first_not_of (' ');
-  last = cap = pos;
-  while ((pos = line.find_first_of (" \"", last)) != std::string::npos)
+
+  bool escaped = false, inquote = false, inspace = true;
+  std::string arg;
+
+  for (auto p = line.begin (); p != line.end (); ++p)
   {
-    if (in_quote)
+    if (escaped)
     {
-      if (line[pos] == '\"')
-      {
-        in_quote = false;
-        argv.push_back (line.substr (cap, pos - cap));
-        ++pos;
-      }
-      else
-      {
-        last = pos + 1;
-        continue; // space inside quotes, needs to be kept
-      }
+      escaped = false;
+      arg += unescape (*p);
+      continue;
     }
-    else
+    if (*p == ' ' && !inquote && !escaped)
     {
-      if (line[pos] == '\"')
-      {
-        in_quote = true;
-        cap = last = pos + 1; // capture from character after "
-        continue;
-      }
-      argv.push_back (line.substr (cap, pos - cap));
+      inspace = true;
+      if (arg.size ())
+        argv.push_back (arg);
+      arg = "";
+      continue;
     }
-
-    // skip to next interesting point
-    cap = last = line.find_first_not_of (' ', pos);
+    if (*p == '"')
+    {
+      inquote = !inquote;
+      continue;
+    }
+    if (inspace && !escaped && *p != ' ')
+    {
+      inspace = false;
+      arg += *p;
+      continue;
+    }
+    if (*p == '\\')
+    {
+      escaped = true;
+      continue;
+    }
+    arg += *p;
   }
-  if (in_quote)
-    throw std::invalid_argument ("malformed line");
+  if (arg.size ())
+    argv.push_back (arg);
 
-  if (last != std::string::npos && last != line.size ())
-    argv.push_back (line.substr (last, pos - last));
+  if (escaped || inquote)
+    throw std::invalid_argument ("malformed line");
 
   return argv;
 }
@@ -131,6 +188,8 @@ int main (int argc, char *argv[])
         process_clear_expect (cmd_argv);
       else if (line.find ("wait") == 0)
         process_wait (cmd_argv);
+      else if (line.find ("write") == 0)
+        process_write (cmd_argv);
       else if (line.find ("exit") == 0)
         break;
       else
