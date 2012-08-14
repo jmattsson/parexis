@@ -33,6 +33,7 @@
 #include "PXIO.h"
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 namespace ParEx
 {
@@ -82,6 +83,14 @@ PXIO::putc (char c)
     throw PXIO::E_AGAIN ();
   else if (ret < 0)
     throw_errno ();
+}
+
+
+void
+PXIO::close_on_exec (int fd)
+{
+  if (fd < 0 || fcntl (fd, F_SETFL, O_CLOEXEC) == -1)
+    throw PXIO::E_ERR ();
 }
 
 } // namespace

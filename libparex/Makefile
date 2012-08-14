@@ -9,6 +9,7 @@ SRCS= \
 	src/PXIO.cc \
 	src/PXFileIO.cc \
 	src/PXSerialIO.cc \
+	src/PXProcessIO.cc \
 	src/PXInterleavedPrinter.cc \
 
 OBJS=$(SRCS:.cc=.o)

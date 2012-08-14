@@ -30,88 +30,35 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "PXSerialIO.h"
-#include <cstring>
-#include <errno.h>
+#ifndef _PXPROCESSIO_H_
+#define _PXPROCESSIO_H_
+
+#include "PXIO.h"
+#include <string>
+#include <vector>
+#include <cstdint>
 #include <unistd.h>
-#include <fcntl.h>
-
-namespace
-{
-using namespace ParEx;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-bool
-cfg_serial (int fd, speed_t br_key, bool only_7_bits, parity_t parity, bool two_stop_bits)
-{
-  struct termios tty;
-  memset (&tty, 0, sizeof tty);
-  if (tcgetattr (fd, &tty) != 0)
-    return false;
-
-  cfmakeraw (&tty);
-
-  cfsetospeed (&tty, br_key);
-  cfsetispeed (&tty, br_key);
-
-  tty.c_cc[VMIN]  = 0;
-  tty.c_cc[VTIME] = 0;
-
-  tty.c_cflag &= ~CRTSCTS;
-  tty.c_cflag |= CLOCAL | CREAD;
-
-  if (parity == PARITY_EVEN)
-    tty.c_cflag |= PARENB;
-  else if (parity == PARITY_ODD)
-    tty.c_cflag |= PARENB | PARODD;
-
-  if (only_7_bits)
-    tty.c_cflag &= ~CS8;
-
-  if (two_stop_bits)
-    tty.c_cflag |= CSTOPB;
-  else
-    tty.c_cflag &= ~CSTOPB;
-
-  if (tcsetattr (fd, TCSANOW, &tty) != 0)
-    return false;
-
-  return true;
-}
-#pragma GCC diagnostic pop
-
-} // anon
 
 namespace ParEx
 {
 
-PXSerialIO::PXSerialIO (const std::string &dev, speed_t br_key, bool only_7_bits, parity_t par, bool two_stop_bits)
-  : PXIO (-1),
-    dev_ (dev),
-    br_ (br_key), seven_ (only_7_bits), par_ (par), stops_ (two_stop_bits)
+typedef std::vector<std::string> argv_t;
+
+class PXProcessIO : public PXIO
 {
-  fd_ = open ();
-}
+  public:
+    explicit PXProcessIO (const argv_t &cmdline);
+    ~PXProcessIO ();
 
+    virtual void reopen ();
 
-void
-PXSerialIO::reopen ()
-{
-  int fd = open ();
-  close (fd_);
-  fd_ = fd;
-}
+  private:
+    void do_close ();
+    void do_open ();
 
+    const argv_t cmdline_;
+    pid_t child_;
+};
 
-int
-PXSerialIO::open ()
-{
-  int fd = ::open (dev_.c_str (), O_RDWR);
-  close_on_exec (fd);
-  if (!cfg_serial (fd, br_, seven_, par_, stops_))
-    throw E_ERR ();
-  return fd;
-}
-
-} // namespace
+} // namespace 
+#endif

@@ -39,16 +39,14 @@ namespace ParEx
 PXFileIO::PXFileIO (const std::string &fname)
   : PXIO (open (fname.c_str (), O_RDWR)), fname_ (fname)
 {
-  if (fd_ < 0)
-    throw PXIO::E_ERR ();
+  close_on_exec (fd_);
 }
 
 
 void PXFileIO::reopen ()
 {
   int fd = open (fname_.c_str (), O_RDWR);
-  if (fd_ < 0)
-    throw PXIO::E_ERR ();
+  close_on_exec (fd);
   close (fd_);
   fd_ = fd;
 }

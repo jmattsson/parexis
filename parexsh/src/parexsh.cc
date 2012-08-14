@@ -3,6 +3,7 @@
 #include "PXInterleavedPrinter.h"
 #include "PXFileIO.h"
 #include "PXSerialIO.h"
+#include "PXProcessIO.h"
 #include <cstdio>
 #include <iostream>
 #include <stdexcept>
@@ -10,8 +11,6 @@
 #include <algorithm>
 
 using namespace ParEx;
-
-typedef std::vector<std::string> argv_t;
 
 std::shared_ptr<PXPrinter> printer (new PXInterleavedPrinter (stderr));
 PXDriver driver (printer);
@@ -50,6 +49,12 @@ void process_open_cmd (argv_t &argv)
         argv[5][0] == '7',
         argv[5][1] == 'O' ? PARITY_ODD : argv[5][1] == 'E' ? PARITY_EVEN : NO_PARITY,
         argv[5][2] == '2'));
+  }
+  else if (argv[1] == "process" && argv.size () > 3)
+  {
+    // process <channel> <cmd> [arg1 .. argN]
+    argv_t proc (++ ++ ++argv.begin (), argv.end ()); // ignore first 3 args
+    io.reset (new PXProcessIO (proc));
   }
   else
     throw std::invalid_argument ("bad args");

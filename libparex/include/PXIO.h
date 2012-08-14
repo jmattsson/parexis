@@ -57,6 +57,8 @@ class PXIO
     int select_fd () { return fd_; }
 
   protected:
+    static void close_on_exec (int fd);
+
     int fd_;
 };
 
